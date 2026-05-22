@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { useApp } from "@/context/AppContext";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,7 @@ const navItems = [
 
 export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, setUser } = useApp();
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--surface)]">
@@ -64,17 +66,36 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
 
           {/* Actions */}
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => onNavigate("cabinet")}
-              className={`hidden md:flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 ${
-                currentPage === "cabinet"
-                  ? "bg-[var(--gold)] text-[var(--navy)]"
-                  : "border border-white/30 text-white hover:border-[var(--gold)] hover:text-[var(--gold)]"
-              }`}
-            >
-              <Icon name="User" size={15} />
-              Личный кабинет
-            </button>
+            {user ? (
+              <div className="hidden md:flex items-center gap-3">
+                <button
+                  onClick={() => onNavigate(user.role === "seller" ? "seller-cabinet" : "cabinet")}
+                  className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                    currentPage === "cabinet" || currentPage === "seller-cabinet"
+                      ? "bg-[var(--gold)] text-[var(--navy)]"
+                      : "border border-white/30 text-white hover:border-[var(--gold)] hover:text-[var(--gold)]"
+                  }`}
+                >
+                  <Icon name={user.role === "seller" ? "Store" : "User"} size={15} />
+                  {user.company.length > 18 ? user.company.slice(0, 18) + "…" : user.company}
+                </button>
+                <button onClick={() => { setUser(null); onNavigate("home"); }}
+                  className="text-gray-400 hover:text-white transition-colors" title="Выйти">
+                  <Icon name="LogOut" size={16} />
+                </button>
+              </div>
+            ) : (
+              <div className="hidden md:flex items-center gap-2">
+                <button onClick={() => onNavigate("auth")}
+                  className="border border-white/30 text-white px-4 py-2 text-sm font-medium hover:border-[var(--gold)] hover:text-[var(--gold)] transition-all">
+                  Войти
+                </button>
+                <button onClick={() => onNavigate("auth")}
+                  className="bg-[var(--gold)] text-[var(--navy)] px-4 py-2 text-sm font-semibold hover:bg-[var(--gold-light)] transition-all">
+                  Разместить товар
+                </button>
+              </div>
+            )}
             <button
               className="md:hidden text-white p-1"
               onClick={() => setMobileOpen(!mobileOpen)}
