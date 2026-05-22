@@ -18,7 +18,7 @@ const navItems = [
 
 export default function Layout({ children, currentPage, onNavigate }: LayoutProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, setUser } = useApp();
+  const { user, logout } = useApp();
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--surface)]">
@@ -79,7 +79,7 @@ export default function Layout({ children, currentPage, onNavigate }: LayoutProp
                   <Icon name={user.role === "seller" ? "Store" : "User"} size={15} />
                   {user.company.length > 18 ? user.company.slice(0, 18) + "…" : user.company}
                 </button>
-                <button onClick={() => { setUser(null); onNavigate("home"); }}
+                <button onClick={() => { logout(); onNavigate("home"); }}
                   className="text-gray-400 hover:text-white transition-colors" title="Выйти">
                   <Icon name="LogOut" size={16} />
                 </button>

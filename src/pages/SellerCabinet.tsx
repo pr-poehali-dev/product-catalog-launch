@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApp, Product } from "@/context/AppContext";
 import Icon from "@/components/ui/icon";
 
+
 const CATEGORIES = ["Насосное оборудование", "Компрессоры", "Запорная арматура", "КИПиА", "Электрооборудование", "Инструмент и оснастка"];
 
 type Tab = "products" | "add" | "inquiries" | "profile";
@@ -25,32 +26,40 @@ const emptyForm: ProductFormData = {
 };
 
 export default function SellerCabinet({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { user, setUser, products, addProduct, updateProduct, deleteProduct } = useApp();
+  const { user, logout, products, addProduct, updateProduct, deleteProduct, loadProducts } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>("products");
   const [form, setForm] = useState<ProductFormData>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   const myProducts = products.filter(p => p.sellerId === user?.id);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const specs = form.specs.filter(s => s.key && s.value);
-    const tags = form.tags.split(",").map(t => t.trim()).filter(Boolean);
-
-    if (editingId) {
-      updateProduct(editingId, { ...form, specs, tags });
-    } else {
-      addProduct({ ...form, specs, tags });
+    setSaving(true);
+    setSaveError("");
+    try {
+      if (editingId) {
+        await updateProduct(editingId, { ...form });
+      } else {
+        await addProduct({ ...form });
+      }
+      setSaved(true);
+      setTimeout(() => {
+        setSaved(false);
+        setForm(emptyForm);
+        setEditingId(null);
+        setActiveTab("products");
+        loadProducts();
+      }, 1200);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Ошибка сохранения");
+    } finally {
+      setSaving(false);
     }
-    setSaved(true);
-    setTimeout(() => {
-      setSaved(false);
-      setForm(emptyForm);
-      setEditingId(null);
-      setActiveTab("products");
-    }, 1500);
   };
 
   const startEdit = (product: Product) => {
@@ -104,7 +113,7 @@ export default function SellerCabinet({ onNavigate }: { onNavigate: (p: string) 
             <h1 className="text-2xl font-bold">{user.company}</h1>
             <div className="text-gray-400 text-sm mt-0.5">{user.country} · {user.email}</div>
           </div>
-          <button onClick={() => { setUser(null); onNavigate("home"); }}
+          <button onClick={() => { logout(); onNavigate("home"); }}
             className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors">
             <Icon name="LogOut" size={15} /> Выйти
           </button>
@@ -323,10 +332,15 @@ export default function SellerCabinet({ onNavigate }: { onNavigate: (p: string) 
                     placeholder="насос, центробежный, водоснабжение" />
                 </div>
 
+                {saveError && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 flex items-center gap-2">
+                    <Icon name="AlertCircle" size={14} /> {saveError}
+                  </div>
+                )}
                 <div className="flex gap-3 pt-2">
-                  <button type="submit" className="btn-primary flex items-center gap-2">
-                    <Icon name={editingId ? "Save" : "Upload"} size={15} />
-                    {editingId ? "Сохранить изменения" : "Опубликовать товар"}
+                  <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 disabled:opacity-60">
+                    {saving ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name={editingId ? "Save" : "Upload"} size={15} />}
+                    {saving ? "Сохраняем..." : (editingId ? "Сохранить изменения" : "Опубликовать товар")}
                   </button>
                   <button type="button" onClick={() => { setForm(emptyForm); setEditingId(null); setActiveTab("products"); }}
                     className="btn-outline">

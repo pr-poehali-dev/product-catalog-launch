@@ -1,0 +1,34 @@
+{
+  "tests": [
+    {
+      "name": "Register new seller",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "register",
+        "name": "Тест Продавец",
+        "company": "ООО ТестПродавец",
+        "inn": "7701234567",
+        "email": "seller_test_xyz789@example.com",
+        "password": "password123",
+        "role": "seller",
+        "country": "Россия"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {"role": "seller"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Login with wrong password",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "login",
+        "email": "seller_test_xyz789@example.com",
+        "password": "wrongpass"
+      },
+      "expectedStatus": 401,
+      "bodyMatcher": "partial"
+    }
+  ]
+}

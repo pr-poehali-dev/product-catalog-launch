@@ -14,17 +14,23 @@ const priceRanges = [
 interface InquiryModalProps {
   product: Product;
   onClose: () => void;
-  onSend: () => void;
+  onSend: (data: { buyer_name: string; buyer_company: string; buyer_phone: string; buyer_email?: string; quantity?: string; note?: string }) => Promise<void>;
 }
 
 function InquiryModal({ product, onClose, onSend }: InquiryModalProps) {
   const [form, setForm] = useState({ name: "", company: "", phone: "", email: "", qty: "1", note: "" });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSend();
-    setSent(true);
+    setSending(true);
+    try {
+      await onSend({ buyer_name: form.name, buyer_company: form.company, buyer_phone: form.phone, buyer_email: form.email, quantity: form.qty, note: form.note });
+      setSent(true);
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -88,8 +94,9 @@ function InquiryModal({ product, onClose, onSend }: InquiryModalProps) {
                   rows={2} className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[var(--navy)] resize-none"
                   placeholder="Уточните требования, условия поставки..." />
               </div>
-              <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
-                <Icon name="Send" size={14} /> Отправить запрос продавцу
+              <button type="submit" disabled={sending} className="btn-primary w-full flex items-center justify-center gap-2 mt-2 disabled:opacity-60">
+                {sending ? <Icon name="Loader2" size={14} className="animate-spin" /> : <Icon name="Send" size={14} />}
+                {sending ? "Отправляем..." : "Отправить запрос продавцу"}
               </button>
             </form>
           )}
@@ -358,7 +365,7 @@ export default function Catalog() {
         <InquiryModal
           product={inquiryProduct}
           onClose={() => setInquiryProduct(null)}
-          onSend={() => sendInquiry(inquiryProduct.id)}
+          onSend={(data) => sendInquiry(inquiryProduct.id, data)}
         />
       )}
     </div>

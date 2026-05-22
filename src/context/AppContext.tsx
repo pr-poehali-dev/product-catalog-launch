@@ -1,4 +1,8 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  apiGetProducts, apiCreateProduct, apiUpdateProduct, apiSendInquiry,
+  apiLogin, apiRegister, apiGetMe
+} from "@/api";
 
 export type UserRole = "buyer" | "seller" | null;
 
@@ -35,100 +39,152 @@ export interface Product {
 
 interface AppContextValue {
   user: User | null;
+  authLoading: boolean;
+  productsLoading: boolean;
   setUser: (u: User | null) => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (data: {
+    name: string; company: string; inn: string; email: string;
+    password: string; role: string; country?: string; description?: string;
+  }) => Promise<void>;
+  logout: () => void;
   products: Product[];
-  addProduct: (p: Omit<Product, "id" | "createdAt" | "inquiries" | "sellerId" | "sellerName" | "sellerCountry" | "sellerVerified">) => void;
-  updateProduct: (id: string, p: Partial<Product>) => void;
+  loadProducts: (params?: object) => Promise<void>;
+  addProduct: (p: {
+    name: string; category: string; price: string; priceUnit: string;
+    minOrder: string; description: string;
+    specs: { key: string; value: string }[]; tags: string; inStock: boolean;
+  }) => Promise<void>;
+  updateProduct: (id: string, p: {
+    name: string; category: string; price: string; priceUnit: string;
+    minOrder: string; description: string;
+    specs: { key: string; value: string }[]; tags: string; inStock: boolean;
+  }) => Promise<void>;
   deleteProduct: (id: string) => void;
-  sendInquiry: (productId: string) => void;
+  sendInquiry: (productId: string, data: {
+    buyer_name: string; buyer_company: string; buyer_phone: string;
+    buyer_email?: string; quantity?: string; note?: string;
+  }) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const DEMO_PRODUCTS: Product[] = [
-  {
-    id: "p1", sellerId: "s1", sellerName: "КМЗ Групп", sellerCountry: "Россия", sellerVerified: true,
-    name: "Насос центробежный ЦНС 38-44", category: "Насосное оборудование",
-    price: "84 500", priceUnit: "шт", minOrder: "1 шт",
-    description: "Центробежный насос для перекачки чистой воды и жидкостей со схожими свойствами. Применяется в системах водоснабжения, теплоснабжения и технологических процессах.",
-    specs: [{ key: "Мощность", value: "7.5 кВт" }, { key: "Подача", value: "38 м³/ч" }, { key: "Напор", value: "44 м" }, { key: "Масса", value: "68 кг" }],
-    tags: ["насос", "центробежный", "водоснабжение"], inStock: true, createdAt: "2024-11-01", inquiries: 24,
-  },
-  {
-    id: "p2", sellerId: "s2", sellerName: "ПКМП Завод", sellerCountry: "Россия", sellerVerified: true,
-    name: "Компрессор поршневой АВО-5/10", category: "Компрессоры",
-    price: "156 000", priceUnit: "шт", minOrder: "1 шт",
-    description: "Поршневой компрессор для сжатия воздуха и нейтральных газов. Используется в промышленных пневмосетях, на производственных предприятиях.",
-    specs: [{ key: "Мощность", value: "15 кВт" }, { key: "Подача", value: "5 м³/мин" }, { key: "Давление", value: "10 атм" }, { key: "Масса", value: "210 кг" }],
-    tags: ["компрессор", "поршневой", "пневматика"], inStock: true, createdAt: "2024-10-20", inquiries: 18,
-  },
-  {
-    id: "p3", sellerId: "s3", sellerName: "Dendor Арматура", sellerCountry: "Беларусь", sellerVerified: false,
-    name: "Задвижка стальная 30с41нж Ду100", category: "Запорная арматура",
-    price: "12 800", priceUnit: "шт", minOrder: "5 шт",
-    description: "Стальная задвижка с обрезиненным клином. Предназначена для трубопроводов горячей и холодной воды, нефтепродуктов.",
-    specs: [{ key: "Ду", value: "100 мм" }, { key: "Ру", value: "16 атм" }, { key: "Температура", value: "до +200°C" }, { key: "Материал", value: "Сталь" }],
-    tags: ["задвижка", "арматура", "трубопровод"], inStock: true, createdAt: "2024-11-05", inquiries: 41,
-  },
-  {
-    id: "p4", sellerId: "s1", sellerName: "КМЗ Групп", sellerCountry: "Россия", sellerVerified: true,
-    name: "Насос вихревой ВКС 2/26", category: "Насосное оборудование",
-    price: "34 200", priceUnit: "шт", minOrder: "1 шт",
-    description: "Вихревой самовсасывающий насос для перекачки чистых маловязких жидкостей. Компактная конструкция, высокий напор.",
-    specs: [{ key: "Мощность", value: "1.5 кВт" }, { key: "Подача", value: "2 м³/ч" }, { key: "Напор", value: "26 м" }, { key: "Масса", value: "18 кг" }],
-    tags: ["насос", "вихревой", "самовсасывающий"], inStock: false, createdAt: "2024-11-10", inquiries: 9,
-  },
-  {
-    id: "p5", sellerId: "s4", sellerName: "ТехноПоставка", sellerCountry: "Казахстан", sellerVerified: true,
-    name: "Электродвигатель АИР 90L4", category: "Электрооборудование",
-    price: "18 900", priceUnit: "шт", minOrder: "3 шт",
-    description: "Асинхронный электродвигатель общепромышленного применения. Класс защиты IP54. Климатическое исполнение У1.",
-    specs: [{ key: "Мощность", value: "2.2 кВт" }, { key: "Обороты", value: "1500 об/мин" }, { key: "Напряжение", value: "380 В" }, { key: "КПД", value: "82%" }],
-    tags: ["электродвигатель", "асинхронный", "АИР"], inStock: true, createdAt: "2024-10-15", inquiries: 33,
-  },
-  {
-    id: "p6", sellerId: "s3", sellerName: "Dendor Арматура", sellerCountry: "Беларусь", sellerVerified: false,
-    name: "Клапан обратный 19с53нж Ду50", category: "Запорная арматура",
-    price: "5 600", priceUnit: "шт", minOrder: "10 шт",
-    description: "Обратный подъёмный клапан для предотвращения обратного тока рабочей среды. Фланцевое присоединение.",
-    specs: [{ key: "Ду", value: "50 мм" }, { key: "Ру", value: "16 атм" }, { key: "Температура", value: "до +425°C" }, { key: "Материал", value: "Сталь 20" }],
-    tags: ["клапан", "обратный", "фланцевый"], inStock: true, createdAt: "2024-11-08", inquiries: 15,
-  },
-];
+function mapProduct(raw: Record<string, unknown>): Product {
+  return {
+    id: String(raw.id),
+    sellerId: String(raw.seller_id),
+    sellerName: String(raw.seller_name ?? raw.sellerName ?? ""),
+    sellerCountry: String(raw.seller_country ?? raw.sellerCountry ?? ""),
+    sellerVerified: Boolean(raw.seller_verified ?? raw.sellerVerified ?? false),
+    name: String(raw.name),
+    category: String(raw.category),
+    price: String(raw.price),
+    priceUnit: String(raw.price_unit ?? raw.priceUnit ?? "шт"),
+    minOrder: String(raw.min_order ?? raw.minOrder ?? "1 шт"),
+    description: String(raw.description ?? ""),
+    specs: (raw.specs as { key: string; value: string }[]) ?? [],
+    tags: (raw.tags as string[]) ?? [],
+    inStock: Boolean(raw.in_stock ?? raw.inStock ?? true),
+    createdAt: String(raw.created_at ?? raw.createdAt ?? ""),
+    inquiries: Number(raw.inquiries_count ?? raw.inquiries ?? 0),
+  };
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [products, setProducts] = useState<Product[]>(DEMO_PRODUCTS);
+  const [user, setUserState] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
 
-  const addProduct = (p: Omit<Product, "id" | "createdAt" | "inquiries" | "sellerId" | "sellerName" | "sellerCountry" | "sellerVerified">) => {
-    if (!user) return;
-    const newProduct: Product = {
-      ...p,
-      id: `p${Date.now()}`,
-      sellerId: user.id,
-      sellerName: user.company,
-      sellerCountry: user.country || "Россия",
-      sellerVerified: false,
-      createdAt: new Date().toISOString().split("T")[0],
-      inquiries: 0,
-    };
+  // Восстановить сессию при загрузке
+  useEffect(() => {
+    const sessionId = localStorage.getItem("session_id");
+    if (!sessionId) { setAuthLoading(false); return; }
+    apiGetMe()
+      .then((u) => setUserState(u as User))
+      .catch(() => localStorage.removeItem("session_id"))
+      .finally(() => setAuthLoading(false));
+  }, []);
+
+  // Загрузить продукты при старте
+  useEffect(() => {
+    loadProducts();
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    const u = await apiLogin(email, password) as User;
+    localStorage.setItem("session_id", u.id);
+    setUserState(u);
+  };
+
+  const register = async (data: Parameters<AppContextValue["register"]>[0]) => {
+    const u = await apiRegister(data) as User;
+    localStorage.setItem("session_id", u.id);
+    setUserState(u);
+  };
+
+  const logout = () => {
+    localStorage.removeItem("session_id");
+    setUserState(null);
+  };
+
+  const setUser = (u: User | null) => {
+    if (!u) logout();
+    else setUserState(u);
+  };
+
+  const loadProducts = async (params?: object) => {
+    setProductsLoading(true);
+    try {
+      const data = await apiGetProducts(params as Parameters<typeof apiGetProducts>[0]);
+      setProducts((data as Record<string, unknown>[]).map(mapProduct));
+    } finally {
+      setProductsLoading(false);
+    }
+  };
+
+  const addProduct = async (p: Parameters<AppContextValue["addProduct"]>[0]) => {
+    const raw = await apiCreateProduct({
+      name: p.name, category: p.category, price: p.price,
+      price_unit: p.priceUnit, min_order: p.minOrder,
+      description: p.description, specs: p.specs,
+      tags: p.tags, in_stock: p.inStock,
+    });
+    const newProduct = mapProduct(raw as Record<string, unknown>);
+    if (user) {
+      newProduct.sellerName = user.company;
+      newProduct.sellerCountry = user.country || "Россия";
+    }
     setProducts(prev => [newProduct, ...prev]);
   };
 
-  const updateProduct = (id: string, p: Partial<Product>) => {
-    setProducts(prev => prev.map(prod => prod.id === id ? { ...prod, ...p } : prod));
+  const updateProduct = async (id: string, p: Parameters<AppContextValue["updateProduct"]>[1]) => {
+    const raw = await apiUpdateProduct(id, {
+      name: p.name, category: p.category, price: p.price,
+      price_unit: p.priceUnit, min_order: p.minOrder,
+      description: p.description, specs: p.specs,
+      tags: p.tags, in_stock: p.inStock,
+    });
+    const updated = mapProduct(raw as Record<string, unknown>);
+    setProducts(prev => prev.map(prod => prod.id === id ? { ...prod, ...updated } : prod));
   };
 
   const deleteProduct = (id: string) => {
     setProducts(prev => prev.filter(prod => prod.id !== id));
   };
 
-  const sendInquiry = (productId: string) => {
+  const sendInquiry = async (productId: string, data: Parameters<AppContextValue["sendInquiry"]>[1]) => {
+    await apiSendInquiry(productId, data);
     setProducts(prev => prev.map(p => p.id === productId ? { ...p, inquiries: p.inquiries + 1 } : p));
   };
 
   return (
-    <AppContext.Provider value={{ user, setUser, products, addProduct, updateProduct, deleteProduct, sendInquiry }}>
+    <AppContext.Provider value={{
+      user, authLoading, productsLoading, setUser,
+      login, register, logout,
+      products, loadProducts,
+      addProduct, updateProduct, deleteProduct, sendInquiry,
+    }}>
       {children}
     </AppContext.Provider>
   );

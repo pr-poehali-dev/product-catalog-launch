@@ -26,7 +26,7 @@ function AppInner() {
       case "about": return <About />;
       case "contacts": return <Contacts />;
       case "support": return <Support />;
-      case "cabinet": return <Cabinet />;
+      case "cabinet": return <Cabinet onNavigate={setCurrentPage} />;
       case "seller-cabinet": return <SellerCabinet onNavigate={setCurrentPage} />;
       case "auth": return <Auth onNavigate={setCurrentPage} />;
       default: return <Home onNavigate={setCurrentPage} />;

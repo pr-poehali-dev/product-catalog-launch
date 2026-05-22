@@ -8,57 +8,65 @@ interface AuthProps {
 }
 
 export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
-  const { setUser } = useApp();
+  const { login, register } = useApp();
   const [mode, setMode] = useState<"login" | "register">(defaultMode);
   const [selectedRole, setSelectedRole] = useState<UserRole>(null);
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({ name: "", company: "", inn: "", email: "", country: "Россия", description: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser({
-      id: `u${Date.now()}`,
-      name: "Иван Петров",
-      company: form.company || "ООО «Демо Компания»",
-      inn: form.inn || "7701234567",
-      email: form.email || "demo@company.ru",
-      role: "buyer",
-      country: "Россия",
-      verified: true,
-    });
-    onNavigate("home");
+    setError("");
+    setLoading(true);
+    try {
+      await login(form.email, form.password);
+      onNavigate("home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка входа");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser({
-      id: `u${Date.now()}`,
-      name: form.name,
-      company: form.company,
-      inn: form.inn,
-      email: form.email,
-      role: selectedRole,
-      country: form.country,
-      description: form.description,
-      verified: false,
-    });
-    onNavigate(selectedRole === "seller" ? "seller-cabinet" : "home");
+    if (!selectedRole) return;
+    setError("");
+    setLoading(true);
+    try {
+      await register({
+        name: form.name,
+        company: form.company,
+        inn: form.inn,
+        email: form.email,
+        password: form.password,
+        role: selectedRole,
+        country: form.country,
+        description: form.description,
+      });
+      onNavigate(selectedRole === "seller" ? "seller-cabinet" : "home");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка регистрации");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center bg-[var(--surface)] py-16 animate-fade-in">
       <div className="w-full max-w-xl">
 
-        {/* Tabs */}
         <div className="flex mb-0 border border-gray-200 bg-white">
           <button
-            onClick={() => { setMode("login"); setStep(1); setSelectedRole(null); }}
+            onClick={() => { setMode("login"); setStep(1); setSelectedRole(null); setError(""); }}
             className={`flex-1 py-3 text-sm font-semibold transition-all ${mode === "login" ? "bg-[var(--navy)] text-white" : "text-gray-400 hover:text-[var(--navy)]"}`}
           >
             Войти
           </button>
           <button
-            onClick={() => { setMode("register"); setStep(1); setSelectedRole(null); }}
+            onClick={() => { setMode("register"); setStep(1); setSelectedRole(null); setError(""); }}
             className={`flex-1 py-3 text-sm font-semibold transition-all ${mode === "register" ? "bg-[var(--navy)] text-white" : "text-gray-400 hover:text-[var(--navy)]"}`}
           >
             Зарегистрироваться
@@ -74,6 +82,11 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                 <h2 className="text-xl font-bold text-[var(--navy)]">Вход в систему</h2>
                 <p className="text-xs text-gray-400 mt-1">Для покупателей и продавцов</p>
               </div>
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 flex items-center gap-2">
+                  <Icon name="AlertCircle" size={14} /> {error}
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Email</label>
                 <input required type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })}
@@ -92,8 +105,9 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                 </label>
                 <span className="text-xs text-[var(--gold)] hover:underline cursor-pointer">Забыли пароль?</span>
               </div>
-              <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
-                <Icon name="LogIn" size={15} /> Войти
+              <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 mt-2 disabled:opacity-60">
+                {loading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="LogIn" size={15} />}
+                {loading ? "Входим..." : "Войти"}
               </button>
               <p className="text-xs text-center text-gray-400 pt-2">
                 Нет аккаунта?{" "}
@@ -114,9 +128,7 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
               <div className="space-y-3 mb-6">
                 <button
                   onClick={() => setSelectedRole("buyer")}
-                  className={`w-full border p-5 text-left transition-all duration-150 flex items-start gap-4 ${
-                    selectedRole === "buyer" ? "border-[var(--navy)] bg-blue-50/40" : "border-gray-200 hover:border-gray-300"
-                  }`}
+                  className={`w-full border p-5 text-left transition-all duration-150 flex items-start gap-4 ${selectedRole === "buyer" ? "border-[var(--navy)] bg-blue-50/40" : "border-gray-200 hover:border-gray-300"}`}
                 >
                   <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${selectedRole === "buyer" ? "bg-[var(--navy)]" : "bg-[var(--surface)]"}`}>
                     <Icon name="ShoppingBag" size={18} className={selectedRole === "buyer" ? "text-[var(--gold)]" : "text-gray-400"} />
@@ -125,16 +137,12 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                     <div className="font-semibold text-[var(--navy)] text-sm mb-1">Покупатель</div>
                     <div className="text-xs text-gray-400 leading-relaxed">Ищу поставщиков, запрашиваю цены, оформляю заказы на промышленное оборудование</div>
                   </div>
-                  {selectedRole === "buyer" && (
-                    <Icon name="CheckCircle2" size={18} className="text-[var(--navy)] ml-auto flex-shrink-0" />
-                  )}
+                  {selectedRole === "buyer" && <Icon name="CheckCircle2" size={18} className="text-[var(--navy)] ml-auto flex-shrink-0" />}
                 </button>
 
                 <button
                   onClick={() => setSelectedRole("seller")}
-                  className={`w-full border p-5 text-left transition-all duration-150 flex items-start gap-4 ${
-                    selectedRole === "seller" ? "border-[var(--gold)] bg-amber-50/40" : "border-gray-200 hover:border-gray-300"
-                  }`}
+                  className={`w-full border p-5 text-left transition-all duration-150 flex items-start gap-4 ${selectedRole === "seller" ? "border-[var(--gold)] bg-amber-50/40" : "border-gray-200 hover:border-gray-300"}`}
                 >
                   <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${selectedRole === "seller" ? "bg-[var(--gold)]" : "bg-[var(--surface)]"}`}>
                     <Icon name="Store" size={18} className={selectedRole === "seller" ? "text-[var(--navy)]" : "text-gray-400"} />
@@ -143,18 +151,14 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                     <div className="font-semibold text-[var(--navy)] text-sm mb-1">Продавец / Поставщик</div>
                     <div className="text-xs text-gray-400 leading-relaxed">Размещаю товары, получаю запросы от покупателей, управляю каталогом</div>
                   </div>
-                  {selectedRole === "seller" && (
-                    <Icon name="CheckCircle2" size={18} className="text-[var(--gold)] ml-auto flex-shrink-0" />
-                  )}
+                  {selectedRole === "seller" && <Icon name="CheckCircle2" size={18} className="text-[var(--gold)] ml-auto flex-shrink-0" />}
                 </button>
               </div>
 
               <button
                 disabled={!selectedRole}
                 onClick={() => setStep(2)}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-all ${
-                  selectedRole ? "btn-primary" : "bg-gray-100 text-gray-300 cursor-not-allowed"
-                }`}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold transition-all ${selectedRole ? "btn-primary" : "bg-gray-100 text-gray-300 cursor-not-allowed"}`}
               >
                 Продолжить <Icon name="ArrowRight" size={15} />
               </button>
@@ -175,6 +179,12 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                   <p className="text-xs text-gray-400">Шаг 2 из 2</p>
                 </div>
               </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-3 py-2 flex items-center gap-2">
+                  <Icon name="AlertCircle" size={14} /> {error}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -229,12 +239,12 @@ export default function Auth({ onNavigate, defaultMode = "login" }: AuthProps) {
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Пароль *</label>
                 <input required type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
                   className="w-full border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--navy)]"
-                  placeholder="Минимум 8 символов" minLength={6} />
+                  placeholder="Минимум 6 символов" minLength={6} />
               </div>
 
-              <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
-                <Icon name="UserPlus" size={15} />
-                {selectedRole === "seller" ? "Зарегистрироваться как поставщик" : "Создать аккаунт"}
+              <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2 mt-2 disabled:opacity-60">
+                {loading ? <Icon name="Loader2" size={15} className="animate-spin" /> : <Icon name="UserPlus" size={15} />}
+                {loading ? "Регистрируем..." : (selectedRole === "seller" ? "Зарегистрироваться как поставщик" : "Создать аккаунт")}
               </button>
               <p className="text-xs text-center text-gray-400">Нажимая кнопку, вы соглашаетесь с условиями оферты</p>
             </form>

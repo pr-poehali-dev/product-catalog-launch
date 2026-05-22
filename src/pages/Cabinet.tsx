@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
+import { useApp } from "@/context/AppContext";
 
 const orders = [
   { id: "ЗК-2024-1847", date: "15.11.2024", status: "Доставлен", statusColor: "green", amount: 284500, items: 3, tracking: "RP784512345RU" },
@@ -26,51 +27,23 @@ const statusColors: Record<string, string> = {
 
 type Tab = "orders" | "docs" | "profile";
 
-export default function Cabinet() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loginData, setLoginData] = useState({ inn: "", password: "" });
+export default function Cabinet({ onNavigate }: { onNavigate?: (p: string) => void }) {
+  const { user, logout } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>("orders");
 
-  if (!isLoggedIn) {
+  if (!user) {
     return (
       <div className="animate-fade-in min-h-[60vh] flex items-center justify-center bg-[var(--surface)] py-16">
-        <div className="bg-white border border-gray-100 p-10 w-full max-w-md shadow-sm">
-          <div className="w-12 h-12 bg-[var(--navy)] flex items-center justify-center mb-6">
+        <div className="bg-white border border-gray-100 p-10 w-full max-w-md shadow-sm text-center">
+          <div className="w-12 h-12 bg-[var(--navy)] flex items-center justify-center mb-6 mx-auto">
             <Icon name="User" size={22} className="text-[var(--gold)]" />
           </div>
-          <div className="section-label mb-2">Вход в систему</div>
-          <h1 className="text-2xl font-bold text-[var(--navy)] mb-1">Личный кабинет</h1>
-          <p className="text-sm text-gray-400 mb-8">Для юридических лиц</p>
-
-          <form onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">ИНН организации</label>
-              <input required value={loginData.inn} onChange={e => setLoginData({ ...loginData, inn: e.target.value })}
-                className="w-full border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--navy)] font-mono-num"
-                placeholder="7701234567" maxLength={12} />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Пароль</label>
-              <input required type="password" value={loginData.password} onChange={e => setLoginData({ ...loginData, password: e.target.value })}
-                className="w-full border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--navy)]"
-                placeholder="••••••••" />
-            </div>
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
-                <input type="checkbox" className="w-3 h-3" />
-                Запомнить меня
-              </label>
-              <span className="text-xs text-[var(--gold)] hover:underline cursor-pointer">Забыли пароль?</span>
-            </div>
-            <button type="submit" className="btn-primary w-full flex items-center justify-center gap-2 mt-2">
-              <Icon name="LogIn" size={15} />
-              Войти
-            </button>
-          </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-100 text-center">
-            <p className="text-xs text-gray-400">Нет доступа? <span className="text-[var(--gold)] cursor-pointer hover:underline">Подать заявку на регистрацию</span></p>
-          </div>
+          <div className="section-label mb-2">Личный кабинет</div>
+          <h1 className="text-2xl font-bold text-[var(--navy)] mb-3">Войдите в систему</h1>
+          <p className="text-sm text-gray-400 mb-6">Для просмотра заказов и документов</p>
+          <button onClick={() => onNavigate?.("auth")} className="btn-primary w-full flex items-center justify-center gap-2">
+            <Icon name="LogIn" size={15} /> Войти или зарегистрироваться
+          </button>
         </div>
       </div>
     );
@@ -83,11 +56,11 @@ export default function Cabinet() {
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <div>
             <div className="section-label mb-1">Личный кабинет</div>
-            <h1 className="text-2xl font-bold">ООО «Промышленные Решения»</h1>
-            <div className="text-gray-400 text-sm mt-1">ИНН: 7701234567 · Клиент с 2019 года</div>
+            <h1 className="text-2xl font-bold">{user.company}</h1>
+            <div className="text-gray-400 text-sm mt-1">ИНН: {user.inn} · {user.email}</div>
           </div>
           <button
-            onClick={() => setIsLoggedIn(false)}
+            onClick={() => logout()}
             className="flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors"
           >
             <Icon name="LogOut" size={15} />
@@ -239,14 +212,12 @@ export default function Cabinet() {
             <h2 className="font-semibold text-[var(--navy)] mb-6">Реквизиты организации</h2>
             <div className="bg-white border border-gray-100 p-6 space-y-4">
               {[
-                ["Наименование", "ООО «Промышленные Решения»"],
-                ["ИНН", "7701234567"],
-                ["КПП", "770101001"],
-                ["ОГРН", "1037701234567"],
-                ["Юридический адрес", "117292, г. Москва, ул. Профсоюзная, д. 10"],
-                ["Контактное лицо", "Иванов Иван Иванович"],
-                ["Телефон", "+7 (495) 987-65-43"],
-                ["Email", "ivanov@promresheniya.ru"],
+                ["Наименование", user.company],
+                ["ИНН", user.inn],
+                ["Email", user.email],
+                ["Страна", user.country || "—"],
+                ["Контактное лицо", user.name],
+                ["Роль", user.role === "buyer" ? "Покупатель" : "Продавец"],
               ].map(([key, val]) => (
                 <div key={key} className="flex justify-between py-2.5 border-b border-gray-50 last:border-0">
                   <span className="text-sm text-gray-400">{key}</span>
